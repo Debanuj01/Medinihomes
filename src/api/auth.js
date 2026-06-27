@@ -134,3 +134,13 @@ export async function apiUpdateProfile(updates) {
   tokens.saveUser(data)
   return data
 }
+export function handleGoogleCallback() {
+  const params = new URLSearchParams(window.location.search)
+  const access_token = params.get('access_token')
+  const refresh_token = params.get('refresh_token')
+  if (access_token && refresh_token) {
+    tokens.set(access_token, refresh_token)
+    return true
+  }
+  return false
+}

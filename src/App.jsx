@@ -1,5 +1,6 @@
+import { useEffect } from 'react'
 import { RouterProvider, useRouter } from './context/RouterContext.jsx'
-import { AuthProvider } from './context/AuthContext.jsx'
+import { AuthProvider, useAuth } from './context/AuthContext.jsx'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
 import RegistrationModal from './components/RegistrationModal.jsx'
@@ -14,11 +15,8 @@ import ChatPage from './pages/ChatPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx'
 import RoadmapPage from './pages/RoadmapPage.jsx'
+import { handleGoogleCallback, apiGetMe } from './api/auth.js'
 
-// Route table: top-level segment -> page component.
-// 'property' and 'promoter' are detail routes; the id lives in segments[1]
-// and each page reads it directly via useRouter() rather than receiving it
-// as a prop, so this table only needs to know the route name.
 const ROUTES = {
   home: HomePage,
   properties: PropertiesPage,
@@ -32,19 +30,39 @@ const ROUTES = {
   roadmap: RoadmapPage,
 }
 
+function GoogleCallbackHandler() {
+  const { onAuthSuccess } = useAuth()
+
+  useEffect(() => {
+    // Only runs if URL has ?access_token= (i.e. Google redirected back here)
+    if (window.location.search.includes('access_token')) {
+      const ok = handleGoogleCallback()
+      if (ok) {
+        apiGetMe()
+          .then((user) => {
+            onAuthSuccess(user)
+            // Clean up the URL and go to home
+            window.history.replaceState({}, '', '/')
+          })
+          .catch(() => {
+            window.history.replaceState({}, '', '/')
+          })
+      }
+    }
+  }, [])
+
+  return null
+}
+
 function AppShell() {
   const { segments } = useRouter()
   const routeName = segments[0] || 'home'
   const PageComponent = ROUTES[routeName] || NotFoundPage
-
-  // The chat page manages its own scroll region and fills the viewport
-  // height between header and footer, so it skips the footer entirely —
-  // a footer below a fixed-height chat box would just be dead space below
-  // the fold on desktop and push the composer off-screen on mobile.
   const hideFooter = routeName === 'chat'
 
   return (
     <div className="min-h-screen flex flex-col bg-canvas">
+      <GoogleCallbackHandler />
       <Header />
       <main className="flex-1">
         <PageComponent />
@@ -62,7 +80,7 @@ function NotFoundPage() {
       <p className="font-display font-bold text-navy text-5xl mb-4">404</p>
       <h2 className="font-display font-semibold text-navy text-lg mb-2">Page not found</h2>
       <p className="text-sm text-ink/55 mb-6">
-        This page doesn\u2019t exist in the MediniHomes prototype yet.
+        This page doesn't exist in the MediniHomes prototype yet.
       </p>
       <button
         onClick={() => navigate('home')}

@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from passlib.context import CryptContext
+from fastapi.responses import RedirectResponse
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -200,7 +201,7 @@ async def google_login():
     return {"url": f"https://accounts.google.com/o/oauth2/v2/auth?{query}"}
 
 
-@router.get("/google/callback", response_model=AuthResponse)
+@router.get("/google/callback")
 async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
     async with httpx.AsyncClient() as client:
         token_resp = await client.post(
@@ -245,10 +246,13 @@ async def google_callback(code: str, db: AsyncSession = Depends(get_db)):
         db.add(user)
         await db.flush()
 
-    return AuthResponse(
-        user=UserResponse.model_validate(user),
-        access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+
+    # Redirect back to frontend with tokens in URL
+    frontend_url = settings.FRONTEND_URL
+    return RedirectResponse(
+        url=f"{frontend_url}/auth/callback?access_token={access_token}&refresh_token={refresh_token}"
     )
 
 
